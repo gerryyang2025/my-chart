@@ -78,7 +78,7 @@ Options:
 ## Chart Structure
 
 ```
-mychart/
+mychart/               # Default chart (scaffolded by helm create)
 ├── Chart.yaml          # Chart metadata
 ├── charts/             # Chart dependencies
 ├── templates/          # Kubernetes manifest templates

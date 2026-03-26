@@ -2,21 +2,45 @@
 
 # Helm chart operations and tooling utilities
 #
-# Usage:
-#   ./optools.sh helm setup
-#   ./optools.sh helm create <name> [--generate-name]
-#   ./optools.sh helm push [--dry-run] [--skip-sync] <chart-version>
-#   ./optools.sh helm <any-helm-command> [flags] [args]
-#   ./optools.sh --help / -h
+# This script provides convenient commands for helm chart development and deployment.
+# It wraps helm with additional functionality like chart pushing and repository syncing.
 #
-# Environment variables (can also be set via .env file in project root):
-#   HELM_REPO_URL         Helm repository URL
-#   HELM_REPO_NAME        Helm repository name (e.g. myrepo)
-#   HELM_REPO_USERNAME    Username for helm repo auth
-#   HELM_REPO_PASSWORD    Password for helm repo auth
-#   BCS_SYNC_URL          BCS repo sync trigger URL (optional)
-#   BCS_SYNC_USERNAME     BCS sync auth username
-#   BCS_SYNC_PASSWORD     BCS sync auth password
+# =============================================================================
+# QUICK START
+# =============================================================================
+#   ./optools.sh helm setup              # First time: install helm and plugin
+#   ./optools.sh helm push --dry-run      # Validate chart without pushing
+#   ./optools.sh helm push 1.0.0          # Push chart to repository
+#
+# =============================================================================
+# COMMON WORKFLOWS
+# =============================================================================
+#
+# 1. LOCAL DEVELOPMENT / VALIDATION (no cluster needed)
+#    - helm lint mychart                  # Check chart syntax
+#    - helm template myrelease mychart    # Render and preview YAML
+#
+# 2. CLUSTER TESTING (requires kubeconfig)
+#    - helm install myrelease mychart --dry-run    # Validate against cluster
+#    - helm upgrade myrelease mychart --dry-run     # Test upgrade
+#
+# 3. PUBLISHING
+#    - helm push --dry-run                # Validate before push
+#    - helm push 1.0.0                   # Push with version
+#    - helm push -s 1.1.0-rc1            # Push without repo sync
+#
+# =============================================================================
+# ENVIRONMENT VARIABLES
+# =============================================================================
+# Can be set via environment or .env file in project root:
+#
+#   HELM_REPO_URL       Helm repository URL (e.g. http://helm.example.com/charts/)
+#   HELM_REPO_NAME      Repository name (e.g. myrepo)
+#   HELM_REPO_USERNAME  Username for repository auth
+#   HELM_REPO_PASSWORD  Password for repository auth
+#   BCS_SYNC_URL        BCS repo sync trigger URL (optional, triggers index refresh)
+#   BCS_SYNC_USERNAME   BCS sync auth username
+#   BCS_SYNC_PASSWORD   BCS sync auth password
 #
 # .env file example (in project root):
 #   HELM_REPO_URL=http://helm.example.com/charts/
@@ -26,6 +50,22 @@
 #   BCS_SYNC_URL=http://bcs.example.com/bcs/api/.../helm/repositories/sync/
 #   BCS_SYNC_USERNAME=admin
 #   BCS_SYNC_PASSWORD=secret
+#
+# =============================================================================
+# PASS-THROUGH HELM COMMANDS
+# =============================================================================
+# Any helm command not explicitly handled will be passed through to helm directly.
+# Supported passthrough commands include:
+#   lint, template, install, uninstall, upgrade, rollback, history, list,
+#   get, show, inspect, pull, package, registry, repo, plugin, search, chart, env, version
+#
+# Examples:
+#   ./optools.sh helm show values mychart
+#   ./optools.sh helm pull mychart --untar
+#   ./optools.sh helm list
+#   ./optools.sh helm history myrelease
+#
+# =============================================================================
 
 set -e
 
@@ -35,11 +75,11 @@ set -e
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 PROJECT_ROOT="${SCRIPT_DIR}"
 TOOLS_DIR="${PROJECT_ROOT}/tools"
-HELM_VERSION="4.1.3"
+HELM_VERSION="3.14.1"
 DEFAULT_VERSION="0.1.0"
 
 # Chart directory (relative to project root)
-CHART_DIR="${PROJECT_ROOT}/deploy/helm/my-chart"
+CHART_DIR="${PROJECT_ROOT}/mychart"
 
 # ------------------------------------------------------------------------
 # Environment / .env loading
@@ -97,15 +137,44 @@ Prerequisites:
     - helm plugin 'helm-push' will be installed automatically on first run
     - Helm repository credentials must be valid
 
-Examples:
-    ./optools.sh helm setup
-    ./optools.sh helm create mychart
-    ./optools.sh helm push --dry-run
-    ./optools.sh helm push 1.0.0
-    ./optools.sh helm push --skip-sync 1.1.0-rc1
-    ./optools.sh helm lint deploy/helm/mychart
-    ./optools.sh helm template mychart deploy/helm/mychart
-    ./optools.sh helm install myrelease deploy/helm/mychart --dry-run
+Common Examples:
+
+    # Setup / Installation
+    ./optools.sh helm setup                              # Install helm and helm-push plugin
+
+    # Chart Creation
+    ./optools.sh helm create mychart                     # Create a new chart named 'mychart'
+
+    # Local Validation (no cluster required)
+    ./optools.sh helm lint mychart                       # Lint chart for syntax errors
+    ./optools.sh helm template myrelease mychart          # Render templates, output YAML
+    ./optools.sh helm template myrelease mychart --set image.tag=v1.0  # Render with custom values
+
+    # Dry-run / Validation (requires cluster connection)
+    ./optools.sh helm install myrelease mychart --dry-run # Validate install against cluster
+    ./optools.sh helm upgrade myrelease mychart --dry-run # Validate upgrade against cluster
+
+    # Push to Repository
+    ./optools.sh helm push --dry-run                      # Validate templates, don't push
+    ./optools.sh helm push 1.0.0                          # Push chart version 1.0.0
+    ./optools.sh helm push --skip-sync 1.0.0              # Push without triggering repo sync
+    ./optools.sh helm push -s 2.0.0                       # Short form of --skip-sync
+
+    # Repository Management
+    ./optools.sh helm repo list                           # List configured repos
+    ./optools.sh helm repo update                         # Update repo index cache
+    ./optools.sh helm search repo mychart                  # Search for chart in repos
+
+    # Release Management (requires cluster)
+    ./optools.sh helm list                                # List installed releases
+    ./optools.sh helm status myrelease                   # Show release status
+    ./optools.sh helm history myrelease                   # Show release upgrade history
+    ./optools.sh helm uninstall myrelease                 # Uninstall a release
+
+    # Chart Inspection
+    ./optools.sh helm show all mychart                    # Show full chart details
+    ./optools.sh helm show values mychart                 # Show default values.yaml
+    ./optools.sh helm pull mychart                        # Download chart to local directory
 EOF
 }
 
@@ -133,44 +202,52 @@ setup_helm() {
 
     if [[ -x "${HELM_BIN}" ]]; then
         echo "    helm found: $(${HELM_BIN} version --short)"
-        return 0
+    else
+        echo "==> Setting up helm v${HELM_VERSION} (${OS}/${ARCH}) ..."
+
+        mkdir -p "${HELM_DIR}"
+
+        HELM_ARCHIVE="helm-v${HELM_VERSION}-${OS}-${ARCH}.tar.gz"
+        HELM_URL="https://get.helm.sh/${HELM_ARCHIVE}"
+        HELM_SUBDIR="${HELM_DIR}/${OS}-${ARCH}"
+
+        if [[ ! -f "${HELM_DIR}/${HELM_ARCHIVE}" ]]; then
+            echo "    Downloading ${HELM_URL} ..."
+            curl -fsSL "${HELM_URL}" -o "${HELM_DIR}/${HELM_ARCHIVE}"
+        fi
+
+        if [[ ! -f "${HELM_SUBDIR}/helm" ]]; then
+            echo "    Extracting ..."
+            tar -xzf "${HELM_DIR}/${HELM_ARCHIVE}" -C "${HELM_DIR}"
+            mv "${HELM_SUBDIR}"/* "${HELM_DIR}/"
+            rmdir "${HELM_SUBDIR}"
+            rm -f "${HELM_DIR}/${HELM_ARCHIVE}"
+        fi
+
+        if [[ ! -x "${HELM_BIN}" ]]; then
+            echo "ERROR: Failed to setup helm at ${HELM_BIN}" >&2
+            exit 1
+        fi
+
+        echo "    helm installed: $(${HELM_BIN} version --short)"
     fi
 
-    echo "==> Setting up helm v${HELM_VERSION} (${OS}/${ARCH}) ..."
-
-    mkdir -p "${HELM_DIR}"
-
-    HELM_ARCHIVE="helm-v${HELM_VERSION}-${OS}-${ARCH}.tar.gz"
-    HELM_URL="https://get.helm.sh/${HELM_ARCHIVE}"
-    HELM_SUBDIR="${HELM_DIR}/${OS}-${ARCH}"
-
-    if [[ ! -f "${HELM_DIR}/${HELM_ARCHIVE}" ]]; then
-        echo "    Downloading ${HELM_URL} ..."
-        curl -fsSL "${HELM_URL}" -o "${HELM_DIR}/${HELM_ARCHIVE}"
-    fi
-
-    if [[ ! -f "${HELM_SUBDIR}/helm" ]]; then
-        echo "    Extracting ..."
-        tar -xzf "${HELM_DIR}/${HELM_ARCHIVE}" -C "${HELM_DIR}"
-        mv "${HELM_SUBDIR}"/* "${HELM_DIR}/"
-        rmdir "${HELM_SUBDIR}"
-        rm -f "${HELM_DIR}/${HELM_ARCHIVE}"
-    fi
-
-    if [[ ! -x "${HELM_BIN}" ]]; then
-        echo "ERROR: Failed to setup helm at ${HELM_BIN}" >&2
-        exit 1
-    fi
-
-    echo "    helm installed: $(${HELM_BIN} version --short)"
+    # Set HELM_PLUGINS to global plugin directory (for cm-push)
+    HELM_PLUGINS="${HOME}/Library/helm/plugins"
+    export HELM_PLUGINS
 }
 
 install_helm_push() {
-    if "${HELM_BIN}" plugin list 2>/dev/null | grep -q "^cm-push"; then
+    if "${HELM_BIN}" cm-push --help >/dev/null 2>&1; then
         return 0
     fi
     echo "==> Installing helm-push plugin ..."
-    "${HELM_BIN}" plugin install https://github.com/chartmuseum/helm-push --verify=false
+    "${HELM_BIN}" plugin install https://github.com/chartmuseum/helm-push --version 0.10.4 --verify=false 2>/dev/null || {
+        echo "    Note: plugin install failed, checking if already installed..."
+        if "${HELM_BIN}" cm-push --help >/dev/null 2>&1; then
+            return 0
+        fi
+    }
 }
 
 validate_version() {
@@ -201,41 +278,25 @@ CHART_VERSION=""
 COMMAND=""
 HELM_ARGS=()
 
+# Parse helm commands and flags
+COMMAND=""
 while [[ $# -gt 0 ]]; do
     case "$1" in
         --help|-h)
             show_help
             exit 0
             ;;
-        helm)
-            COMMAND="helm"
-            shift
-            break
-            ;;
-        *)
-            show_help
-            exit 1
-            ;;
-    esac
-done
-
-# Parse helm subcommands
-while [[ $# -gt 0 ]]; do
-    case "$1" in
         setup)
             COMMAND="helm setup"
             shift
-            break
             ;;
         push)
             COMMAND="helm push"
             shift
-            break
             ;;
         create)
             COMMAND="helm create"
             shift
-            break
             ;;
         --dry-run|--dry|-d)
             DRY_RUN=true
@@ -245,17 +306,26 @@ while [[ $# -gt 0 ]]; do
             SKIP_SYNC=true
             shift
             ;;
+        -*)
+            # Unknown flag — collect for passthrough
+            HELM_ARGS+=("$1")
+            shift
+            ;;
+        helm)
+            # Skip 'helm' itself, it's the tool name
+            shift
+            ;;
+        lint|template|install|uninstall|upgrade|rollback|history|list|get|show|inspect|pull|package|registry|repo|plugin|search|chart|env|version|help)
+            # These are common helm commands - treat as passthrough
+            COMMAND="helm"
+            HELM_ARGS+=("$1")
+            shift
+            ;;
         *)
             HELM_ARGS+=("$1")
             shift
             ;;
     esac
-done
-
-# Collect any remaining positional args not handled by the loop above
-while [[ $# -gt 0 ]]; do
-    HELM_ARGS+=("$1")
-    shift
 done
 
 # ------------------------------------------------------------------------
@@ -270,19 +340,38 @@ case "${COMMAND}" in
         ;;
     "helm create")
         setup_helm
-        if [[ ${#HELM_ARGS[@]} -eq 0 ]]; then
+        # Extract first non-flag arg as chart name
+        CHART_NAME=""
+        for arg in "${HELM_ARGS[@]}"; do
+            if [[ -z "${CHART_NAME}" && ! "${arg}" =~ ^- ]]; then
+                CHART_NAME="${arg}"
+            fi
+        done
+        if [[ -z "${CHART_NAME}" ]]; then
             echo "ERROR: chart name is required." >&2
             echo "Usage: $0 helm create <name>" >&2
             echo "       Example: $0 helm create mychart" >&2
             exit 1
         fi
-        echo "==> Creating chart: ${HELM_ARGS[*]}"
-        "${HELM_BIN}" create "${HELM_ARGS[@]}"
+        echo "==> Creating chart: ${CHART_NAME}"
+        "${HELM_BIN}" create "${CHART_NAME}"
         exit 0
         ;;
     "helm push")
         load_env
         setup_helm
+
+        # Extract chart version from args (first non-flag positional arg)
+        CHART_VERSION=""
+        REMAINING=()
+        for arg in "${HELM_ARGS[@]}"; do
+            if [[ -z "${CHART_VERSION}" && ! "${arg}" =~ ^- ]]; then
+                CHART_VERSION="${arg}"
+            else
+                REMAINING+=("${arg}")
+            fi
+        done
+        HELM_ARGS=("${REMAINING[@]}")
 
         if [[ "${DRY_RUN}" != "true" && -z "${CHART_VERSION}" ]]; then
             validate_version "${CHART_VERSION}"
@@ -298,9 +387,12 @@ case "${COMMAND}" in
         if [[ "${DRY_RUN}" == "true" ]]; then
             echo "==> Running dry-run: validating chart templates ..."
 
-            if [[ -n "${CHART_VERSION}" ]]; then
+            # Only override version if CHART_VERSION looks like a semver (contains at least one dot)
+            # and the override actually differs from current version
+            CURRENT_VERSION=$(grep "^version:" "${CHART_DIR}/Chart.yaml" | awk '{print $2}')
+            if [[ -n "${CHART_VERSION}" && "${CHART_VERSION}" == *.* && "${CHART_VERSION}" != "${CURRENT_VERSION}" ]]; then
                 echo "    Note: chart version will be temporarily set to ${CHART_VERSION} for validation"
-                sed -i "s/^version:.*/version: ${CHART_VERSION}/" "${CHART_DIR}/Chart.yaml"
+                sed -i '' "s/^version:.*/version: ${CHART_VERSION}/" "${CHART_DIR}/Chart.yaml"
             fi
 
             echo "==> Rendering chart templates ..."
@@ -309,12 +401,15 @@ case "${COMMAND}" in
                 echo "==> succ: dry-run passed, chart templates are valid"
             else
                 echo "ERROR: dry-run failed, chart templates have errors" >&2
-                sed -i "s/^version:.*/version: ${DEFAULT_VERSION}/" "${CHART_DIR}/Chart.yaml"
+                if [[ -n "${CURRENT_VERSION}" ]]; then
+                    sed -i '' "s/^version:.*/version: ${CURRENT_VERSION}/" "${CHART_DIR}/Chart.yaml"
+                fi
                 exit 1
             fi
 
-            if [[ -n "${CHART_VERSION}" ]]; then
-                sed -i "s/^version:.*/version: ${DEFAULT_VERSION}/" "${CHART_DIR}/Chart.yaml"
+            # Restore original version if we changed it
+            if [[ -n "${CURRENT_VERSION}" && "${CHART_VERSION}" == *.* && "${CHART_VERSION}" != "${CURRENT_VERSION}" ]]; then
+                sed -i '' "s/^version:.*/version: ${CURRENT_VERSION}/" "${CHART_DIR}/Chart.yaml"
             fi
             exit 0
         fi
@@ -339,32 +434,29 @@ case "${COMMAND}" in
         # Temporarily update chart version if requested
         if [[ -n "${CHART_VERSION}" ]]; then
             echo "==> Updating chart version: ${ORIGINAL_VERSION} -> ${CHART_VERSION}"
-            sed -i "s/^version: ${ORIGINAL_VERSION}/version: ${CHART_VERSION}/" "${CHART_DIR}/Chart.yaml"
+            sed -i '' "s/^version: ${ORIGINAL_VERSION}/version: ${CHART_VERSION}/" "${CHART_DIR}/Chart.yaml"
         fi
 
-        # Add helm repo
-        echo "==> Adding helm repo ${HELM_REPO_NAME} ..."
-        "${HELM_BIN}" repo add "${HELM_REPO_NAME}" "${HELM_REPO_URL}" \
-            --username="${HELM_REPO_USERNAME}" --password="${HELM_REPO_PASSWORD}" 2>/dev/null || {
-            echo "WARNING: repo add failed (may already exist), continuing ..."
-        }
-
-        "${HELM_BIN}" repo update
-
-        # Push chart
+        # Push chart directly using cm-push binary (bypasses helm plugin interface)
         echo "==> Pushing chart to ${HELM_REPO_NAME} ..."
+        CM_PUSH_BIN="${HOME}/Library/helm/plugins/helm-push/bin/helm-cm-push"
+        if [[ ! -x "${CM_PUSH_BIN}" ]]; then
+            echo "ERROR: helm-push plugin binary not found at ${CM_PUSH_BIN}" >&2
+            exit 1
+        fi
+
         set +e
-        PUSH_OUTPUT=$("${HELM_BIN}" cm-push "${CHART_DIR}" "${HELM_REPO_NAME}" 2>&1)
+        PUSH_OUTPUT=$("${CM_PUSH_BIN}" "${CHART_DIR}" "${HELM_REPO_URL}" \
+            --username="${HELM_REPO_USERNAME}" --password="${HELM_REPO_PASSWORD}" 2>&1)
         PUSH_EXIT=$?
         set -e
 
         if [[ "${PUSH_EXIT}" -ne 0 ]]; then
-            if echo "${PUSH_OUTPUT}" | grep -q "409.*already exists"; then
+            if echo "${PUSH_OUTPUT}" | grep -q "already exists"; then
                 echo "    Note: chart version ${CHART_VERSION} already exists in repo"
-                CHART_VERSION=""  # skip version restore since chart was not newly pushed
             else
                 echo "ERROR: failed to push chart (exit ${PUSH_EXIT}): ${PUSH_OUTPUT}" >&2
-                sed -i "s/^version: ${CHART_VERSION}/version: ${ORIGINAL_VERSION}/" "${CHART_DIR}/Chart.yaml" 2>/dev/null
+                sed -i '' "s/^version: ${CHART_VERSION}/version: ${ORIGINAL_VERSION}/" "${CHART_DIR}/Chart.yaml" 2>/dev/null
                 echo "==> Restored original chart version: ${ORIGINAL_VERSION}"
                 exit 1
             fi
@@ -383,7 +475,7 @@ case "${COMMAND}" in
 
         # Restore original chart version after push
         if [[ -n "${CHART_VERSION}" ]]; then
-            sed -i "s/^version: ${CHART_VERSION}/version: ${ORIGINAL_VERSION}/" "${CHART_DIR}/Chart.yaml"
+            sed -i '' "s/^version: ${CHART_VERSION}/version: ${ORIGINAL_VERSION}/" "${CHART_DIR}/Chart.yaml"
             echo "==> Restored original chart version: ${ORIGINAL_VERSION}"
         fi
 
