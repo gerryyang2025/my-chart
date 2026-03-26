@@ -1,0 +1,28 @@
+# Helm
+charts/*.tgz
+
+# Tools (downloaded binaries)
+tools/helm-*/
+
+# Environment (contains secrets)
+.env
+
+# macOS
+.DS_Store
+
+# Editor
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+dist/
+build/
+
+# Node
+node_modules/
+npm-debug.log
