@@ -146,7 +146,7 @@ Common Examples:
     ./optools.sh helm create mychart                     # Create a new chart named 'mychart'
 
     # Local Validation (no cluster required)
-    ./optools.sh helm lint mychart                       # Lint chart for syntax errors
+    ./optools.sh helm lint mychart                        # Lint chart for syntax errors
     ./optools.sh helm template myrelease mychart          # Render templates, output YAML
     ./optools.sh helm template myrelease mychart --set image.tag=v1.0  # Render with custom values
 
@@ -163,11 +163,11 @@ Common Examples:
     # Repository Management
     ./optools.sh helm repo list                           # List configured repos
     ./optools.sh helm repo update                         # Update repo index cache
-    ./optools.sh helm search repo mychart                  # Search for chart in repos
+    ./optools.sh helm search repo mychart                 # Search for chart in repos
 
     # Release Management (requires cluster)
     ./optools.sh helm list                                # List installed releases
-    ./optools.sh helm status myrelease                   # Show release status
+    ./optools.sh helm status myrelease                    # Show release status
     ./optools.sh helm history myrelease                   # Show release upgrade history
     ./optools.sh helm uninstall myrelease                 # Uninstall a release
 

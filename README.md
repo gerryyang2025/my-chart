@@ -116,9 +116,11 @@ Note:
 ### Local Development / Validation (no cluster needed)
 
 ```bash
-./optools.sh helm lint mychart                  # Check chart syntax
-./optools.sh helm template myrelease mychart    # Render and preview YAML
-./optools.sh helm template myrelease mychart --set image.tag=v1.0  # Render with custom values
+./optools.sh helm lint mychart                                      # Check chart syntax
+./optools.sh helm template myrelease mychart                        # Render all templates
+./optools.sh helm template myrelease mychart --set image.tag=v1.0    # Render with custom values
+./optools.sh helm template myrelease mychart --show-only templates/deployment.yaml  # Render specific template
+./optools.sh helm template myrelease mychart | grep -v '^# Source:'  # Render without source comments
 ```
 
 ### Cluster Testing (requires kubeconfig)
