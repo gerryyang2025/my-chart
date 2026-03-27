@@ -269,6 +269,21 @@ require_env() {
     fi
 }
 
+# Commands that require Kubernetes cluster connection
+CLUSTER_COMMANDS="list|install|uninstall|upgrade|rollback|history|status|get"
+
+check_cluster() {
+    if ! "${HELM_BIN}" version --short >/dev/null 2>&1; then
+        echo "ERROR: Cannot connect to Kubernetes cluster" >&2
+        echo "Please check:" >&2
+        echo "  1. kubeconfig is properly configured (kubectl config current-context)" >&2
+        echo "  2. Cluster is accessible" >&2
+        echo "  3. For local validation, use: helm template" >&2
+        return 1
+    fi
+    return 0
+}
+
 # ------------------------------------------------------------------------
 # Argument parsing
 # ------------------------------------------------------------------------
@@ -315,7 +330,7 @@ while [[ $# -gt 0 ]]; do
             # Skip 'helm' itself, it's the tool name
             shift
             ;;
-        lint|template|install|uninstall|upgrade|rollback|history|list|get|show|inspect|pull|package|registry|repo|plugin|search|chart|env|version|help)
+        lint|template|install|uninstall|upgrade|rollback|history|list|get|show|inspect|pull|package|registry|repo|plugin|search|chart|env|version|status|help)
             # These are common helm commands - treat as passthrough
             COMMAND="helm"
             HELM_ARGS+=("$1")
@@ -506,6 +521,18 @@ case "${COMMAND}" in
     "helm")
         # Pass through arbitrary helm commands
         setup_helm
+
+        # Check cluster connectivity for cluster-dependent commands
+        if [[ -n "${HELM_ARGS[*]}" ]]; then
+            FIRST_CMD="${HELM_ARGS[0]}"
+            if [[ "${FIRST_CMD}" =~ ^(${CLUSTER_COMMANDS})$ ]]; then
+                echo "    Checking cluster connection ..."
+                if ! check_cluster; then
+                    exit 1
+                fi
+            fi
+        fi
+
         echo "==> Running: helm ${HELM_ARGS[*]}"
         "${HELM_BIN}" "${HELM_ARGS[@]}"
         ;;

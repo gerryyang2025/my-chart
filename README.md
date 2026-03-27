@@ -52,12 +52,13 @@ Downloads and installs Helm v3.14.1 and the helm-push plugin automatically.
 - **Dry-run mode**: Complete validation (lint + template render) without pushing to repository
 - **Lint**: Check chart structure and syntax
 - **Template**: Render and preview YAML manifests
+- **Cluster check**: Automatic check for cluster-dependent commands (install, upgrade, list, etc.)
 
-### Chart Publishing
+### Safety Checks
 
-- Push charts to remote Helm repository with version management
-- Automatic version temporary modification during push (restored after)
-- Optional BCS repo sync trigger after successful push
+- **Duplicate prevention**: Prevents creating charts with existing directory names
+- **Version conflict handling**: Detects already-pushed chart versions
+- **Cluster connectivity**: Validates Kubernetes connection before cluster commands
 
 ## Tools
 
@@ -104,6 +105,10 @@ Options:
     --help / -h         Show help message and exit
     --dry-run / -d      Validate templates without pushing
     --skip-sync / -s    Skip the repo sync step after pushing
+
+Note:
+    Commands requiring cluster connection (install, upgrade, list, etc.)
+    will check connectivity before execution
 ```
 
 ## Common Workflows
