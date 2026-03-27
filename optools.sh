@@ -353,6 +353,14 @@ case "${COMMAND}" in
             echo "       Example: $0 helm create mychart" >&2
             exit 1
         fi
+
+        # Check if chart directory already exists
+        if [[ -d "${CHART_NAME}" ]]; then
+            echo "ERROR: chart '${CHART_NAME}' already exists at ${CHART_NAME}/" >&2
+            echo "Please choose a different name or remove the existing directory." >&2
+            exit 1
+        fi
+
         echo "==> Creating chart: ${CHART_NAME}"
         "${HELM_BIN}" create "${CHART_NAME}"
         exit 0
