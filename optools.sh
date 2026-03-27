@@ -172,8 +172,9 @@ Common Examples:
     ./optools.sh helm uninstall myrelease                 # Uninstall a release
 
     # Chart Inspection
-    ./optools.sh helm show all mychart                    # Show full chart details
-    ./optools.sh helm show values mychart                 # Show default values.yaml
+    ./optools.sh helm show chart mychart                  # Show Chart.yaml contents
+    ./optools.sh helm show values mychart                 # Show values.yaml contents
+    ./optools.sh helm show all mychart                    # Show Chart.yaml + values.yaml (full details)
     ./optools.sh helm pull mychart                        # Download chart to local directory
 EOF
 }
@@ -471,6 +472,16 @@ case "${COMMAND}" in
             echo "==> Updating chart version: ${ORIGINAL_VERSION} -> ${CHART_VERSION}"
             sed -i '' "s/^version: ${ORIGINAL_VERSION}/version: ${CHART_VERSION}/" "${CHART_DIR}/Chart.yaml"
         fi
+
+        # Add helm repo if not already present
+        if ! "${HELM_BIN}" repo list 2>/dev/null | grep -q "^${HELM_REPO_NAME} "; then
+            echo "==> Adding helm repo ${HELM_REPO_NAME} ..."
+            "${HELM_BIN}" repo add "${HELM_REPO_NAME}" "${HELM_REPO_URL}" \
+                --username="${HELM_REPO_USERNAME}" --password="${HELM_REPO_PASSWORD}"
+        fi
+
+        echo "==> Updating helm repo index ..."
+        "${HELM_BIN}" repo update
 
         # Push chart directly using cm-push binary (bypasses helm plugin interface)
         echo "==> Pushing chart to ${HELM_REPO_NAME} ..."
