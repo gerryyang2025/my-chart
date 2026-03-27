@@ -109,6 +109,17 @@ Options:
 Note:
     Commands requiring cluster connection (install, upgrade, list, etc.)
     will check connectivity before execution
+
+### Passing Flags to Helm
+
+When passing flags to helm through optools, use `--` to prevent optools from intercepting flags:
+
+```bash
+./optools.sh helm get -- -h    # Show helm get help (not optools help)
+./optools.sh helm install -- --dry-run  # Pass --dry-run to helm
+```
+
+`--` is a Unix/Linux convention that tells the shell to treat everything after it as arguments, not options.
 ```
 
 ## Common Workflows
