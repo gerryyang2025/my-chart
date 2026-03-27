@@ -393,7 +393,7 @@ case "${COMMAND}" in
 
         # --dry-run: validate templates without pushing
         if [[ "${DRY_RUN}" == "true" ]]; then
-            echo "==> Running dry-run: validating chart templates ..."
+            echo "==> Running dry-run: validating chart ..."
 
             # Only override version if CHART_VERSION looks like a semver (contains at least one dot)
             # and the override actually differs from current version
@@ -403,17 +403,29 @@ case "${COMMAND}" in
                 sed -i '' "s/^version:.*/version: ${CHART_VERSION}/" "${CHART_DIR}/Chart.yaml"
             fi
 
-            echo "==> Rendering chart templates ..."
-            if "${HELM_BIN}" template "${CHART_DIR}" 2>&1; then
-                echo ""
-                echo "==> succ: dry-run passed, chart templates are valid"
-            else
-                echo "ERROR: dry-run failed, chart templates have errors" >&2
+            # Step 1: Lint chart structure
+            echo "==> Linting chart structure ..."
+            if ! "${HELM_BIN}" lint "${CHART_DIR}" 2>&1; then
+                echo "ERROR: chart lint failed" >&2
                 if [[ -n "${CURRENT_VERSION}" ]]; then
                     sed -i '' "s/^version:.*/version: ${CURRENT_VERSION}/" "${CHART_DIR}/Chart.yaml"
                 fi
                 exit 1
             fi
+
+            # Step 2: Render templates
+            echo "==> Rendering chart templates ..."
+            if ! "${HELM_BIN}" template "${CHART_DIR}" 2>&1; then
+                echo "ERROR: chart template render failed" >&2
+                if [[ -n "${CURRENT_VERSION}" ]]; then
+                    sed -i '' "s/^version:.*/version: ${CURRENT_VERSION}/" "${CHART_DIR}/Chart.yaml"
+                fi
+                exit 1
+            fi
+
+            echo ""
+            echo "==> succ: dry-run passed (lint + template render)"
+            echo "    Chart is ready to push"
 
             # Restore original version if we changed it
             if [[ -n "${CURRENT_VERSION}" && "${CHART_VERSION}" == *.* && "${CHART_VERSION}" != "${CURRENT_VERSION}" ]]; then

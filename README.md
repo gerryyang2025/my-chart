@@ -49,8 +49,8 @@ Downloads and installs Helm v3.14.1 and the helm-push plugin automatically.
 
 ### Chart Validation
 
-- **Dry-run mode**: Validate chart templates without pushing to repository
-- **Lint**: Check chart syntax
+- **Dry-run mode**: Complete validation (lint + template render) without pushing to repository
+- **Lint**: Check chart structure and syntax
 - **Template**: Render and preview YAML manifests
 
 ### Chart Publishing
