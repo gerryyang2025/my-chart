@@ -461,7 +461,8 @@ case "${COMMAND}" in
 
         if [[ "${PUSH_EXIT}" -ne 0 ]]; then
             if echo "${PUSH_OUTPUT}" | grep -q "already exists"; then
-                echo "    Note: chart version ${CHART_VERSION} already exists in repo"
+                echo "    Note: chart version ${CHART_VERSION} already exists in repo (no changes made)"
+                echo "==> Chart is already up to date"
             else
                 echo "ERROR: failed to push chart (exit ${PUSH_EXIT}): ${PUSH_OUTPUT}" >&2
                 sed -i '' "s/^version: ${CHART_VERSION}/version: ${ORIGINAL_VERSION}/" "${CHART_DIR}/Chart.yaml" 2>/dev/null
