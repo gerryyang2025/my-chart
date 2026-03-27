@@ -132,6 +132,10 @@ When passing flags to helm through optools, use `--` to prevent optools from int
 ./optools.sh helm template myrelease mychart --set image.tag=v1.0    # Render with custom values
 ./optools.sh helm template myrelease mychart --show-only templates/deployment.yaml  # Render specific template
 ./optools.sh helm template myrelease mychart | grep -v '^# Source:'  # Render without source comments
+
+# Multi-document values: multiple -f flags, or a single YAML with --- separators
+./optools.sh helm template myrelease mychart -f base.yaml -f dev.yaml  # Multiple files (merged)
+./optools.sh helm template myrelease mychart -f values.yaml            # Single file with --- separators
 ```
 
 ### Cluster Testing (requires kubeconfig)
