@@ -8,6 +8,12 @@ A Helm chart project with an operational toolkit script for common chart operati
 - `curl` installed
 - Helm repository credentials (for `push` command)
 
+## Version Compatibility
+
+This project uses **Helm v3.14.1**. For compatibility with your Kubernetes cluster, please refer to the official [Helm Version Support Policy](https://helm.sh/docs/topics/version_skew/).
+
+> **Note**: It is not recommended to use Helm with a version of Kubernetes that is newer than the version it was compiled against.
+
 ## Quick Start
 
 ```bash
@@ -29,12 +35,37 @@ A Helm chart project with an operational toolkit script for common chart operati
 ./optools.sh helm install myrelease mychart --dry-run
 ```
 
+## Features
+
+### Automatic Environment Detection
+
+The toolkit automatically detects your operating system and architecture:
+- **Supported OS**: macOS (darwin), Linux
+- **Supported Architectures**: amd64, arm64
+
+### Helm Setup
+
+Downloads and installs Helm v3.14.1 and the helm-push plugin automatically.
+
+### Chart Validation
+
+- **Dry-run mode**: Validate chart templates without pushing to repository
+- **Lint**: Check chart syntax
+- **Template**: Render and preview YAML manifests
+
+### Chart Publishing
+
+- Push charts to remote Helm repository with version management
+- Automatic version temporary modification during push (restored after)
+- Optional BCS repo sync trigger after successful push
+
 ## Tools
 
 | File | Description |
 |------|-------------|
 | `optools.sh` | Helm operations control script |
 | `tools/` | Downloaded helm binaries (auto-created on first run) |
+| `mychart/` | Default Helm chart directory |
 
 ## Configuration
 
@@ -60,7 +91,7 @@ cp .env.example .env
 ./optools.sh helm setup
     Download and install helm and helm-push plugin
 
-./optools.sh helm create <name> [--generate-name]
+./optools.sh helm create <name>
     Scaffold a new Helm chart
 
 ./optools.sh helm push [--dry-run] [--skip-sync] <chart-version>
@@ -73,6 +104,32 @@ Options:
     --help / -h         Show help message and exit
     --dry-run / -d      Validate templates without pushing
     --skip-sync / -s    Skip the repo sync step after pushing
+```
+
+## Common Workflows
+
+### Local Development / Validation (no cluster needed)
+
+```bash
+./optools.sh helm lint mychart                  # Check chart syntax
+./optools.sh helm template myrelease mychart    # Render and preview YAML
+./optools.sh helm template myrelease mychart --set image.tag=v1.0  # Render with custom values
+```
+
+### Cluster Testing (requires kubeconfig)
+
+```bash
+./optools.sh helm install myrelease mychart --dry-run  # Validate against cluster
+./optools.sh helm upgrade myrelease mychart --dry-run # Test upgrade
+```
+
+### Publishing
+
+```bash
+./optools.sh helm push --dry-run                # Validate before push
+./optools.sh helm push 1.0.0                    # Push with version
+./optools.sh helm push --skip-sync 1.0.0        # Push without repo sync
+./optools.sh helm push -s 1.1.0-rc1             # Short form of --skip-sync
 ```
 
 ## Chart Structure
