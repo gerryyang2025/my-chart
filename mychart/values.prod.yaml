@@ -1,0 +1,56 @@
+# Production-recommended values for mychart.
+# Only contains values that differ from the defaults in values.yaml.
+# Use with: helm install myrelease mychart -f mychart/values.yaml -f mychart/values.prod.yaml
+# (order matters: later -f files override earlier ones)
+
+# Increase replicas for production (default: 1)
+replicaCount: 2
+
+# Container security context (default: empty - not secure)
+securityContext:
+  runAsNonRoot: false
+  runAsUser: 101
+  runAsGroup: 101
+  allowPrivilegeEscalation: false
+  readOnlyRootFilesystem: true
+  capabilities:
+    drop:
+      - ALL
+
+# Pod security context (default: empty)
+podSecurityContext:
+  runAsNonRoot: false
+  fsGroup: 101
+
+# Resources with limits (default: empty - no resource constraints)
+resources:
+  limits:
+    cpu: "200m"
+    memory: "256Mi"
+  requests:
+    cpu: "100m"
+    memory: "128Mi"
+
+# Enhanced liveness probe with timing tuning (default: basic config only)
+livenessProbe:
+  httpGet:
+    path: /
+    port: http
+  initialDelaySeconds: 10
+  periodSeconds: 10
+  failureThreshold: 3
+
+# Enhanced readiness probe with timing tuning (default: basic config only)
+readinessProbe:
+  httpGet:
+    path: /
+    port: http
+  initialDelaySeconds: 5
+  periodSeconds: 5
+  failureThreshold: 3
+
+# Autoscaling tuning (default: minReplicas: 1, targetCPUUtilizationPercentage: 80)
+autoscaling:
+  minReplicas: 2
+  maxReplicas: 10
+  targetCPUUtilizationPercentage: 70

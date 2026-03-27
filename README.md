@@ -136,6 +136,10 @@ When passing flags to helm through optools, use `--` to prevent optools from int
 # Multi-document values: multiple -f flags, or a single YAML with --- separators
 ./optools.sh helm template myrelease mychart -f base.yaml -f dev.yaml  # Multiple files (merged)
 ./optools.sh helm template myrelease mychart -f values.yaml            # Single file with --- separators
+
+# Production-recommended values (only overrides changed settings)
+# Note: Must include both values.yaml and values.prod.yaml (order matters)
+./optools.sh helm template myrelease mychart -f mychart/values.yaml -f mychart/values.prod.yaml
 ```
 
 ### Cluster Testing (requires kubeconfig)
