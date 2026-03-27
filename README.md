@@ -229,6 +229,65 @@ appVersion: "1.16.0"        # 实际应用版本
 | `app.kubernetes.io/version` | 应用版本（appVersion） |
 | `app.kubernetes.io/managed-by` | 固定值 `Helm` |
 
+### Chart Dependencies (Subcharts)
+
+Helm 支持两种依赖管理方式：
+
+#### Hard Dependency（硬依赖）
+
+依赖的 chart 文件存储在 `charts/` 目录中，随主 chart 一起打包分发。
+
+**结构**：
+```
+mychart/
+├── Chart.yaml
+├── charts/                  # 依赖的 .tgz 包放在这里
+│   └── redis-1.0.0.tgz
+└── templates/
+```
+
+**特点**：
+- 安装时自动一起安装所有依赖
+- 可离线使用（依赖已打包在本地）
+- 打包时 `helm package` 会将 `charts/` 中的依赖一起打包
+
+**使用场景**：紧密耦合的组件，必须同时部署
+
+#### Soft Dependency（软依赖）
+
+依赖信息声明在 `Chart.yaml` 的 `dependencies` 字段中，但 chart 包不存储在本地。
+
+**Chart.yaml 配置**：
+```yaml
+dependencies:
+  - name: redis
+    version: "1.0.0"
+    repository: "https://charts.bitnami.com"
+```
+
+**特点**：
+- 依赖从远程仓库动态下载
+- 需要先 `helm repo add` 添加仓库
+- `helm install` 时自动解析并下载依赖
+
+**安装依赖**：
+```bash
+./optools.sh helm repo add bitnami https://charts.bitnami.com  # 添加仓库
+./optools.sh helm dependency build mychart/                   # 下载依赖到 charts/
+```
+
+**使用场景**：运行时依赖、可选组件、用户自行选择实现方式
+
+#### 对比
+
+| 特性 | Hard Dependency | Soft Dependency |
+|------|-----------------|-----------------|
+| 存储位置 | `charts/` 目录 (.tgz) | 远程仓库 |
+| 安装方式 | 自动一起安装 | 动态下载 |
+| 离线支持 | 支持 | 不支持（需要缓存） |
+| 分发方式 | 打包在一起 | 独立分发 |
+| 依赖管理 | 手动放入 | `helm dependency build` |
+
 ## License
 
 MIT
