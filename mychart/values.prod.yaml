@@ -3,10 +3,18 @@
 # Use with: helm install myrelease mychart -f mychart/values.yaml -f mychart/values.prod.yaml
 # (order matters: later -f files override earlier ones)
 
-# Increase replicas for production (default: 1)
+# --- 服务副本数 ---
+# 影响: 决定运行多少个 Pod 副本，提供高可用和负载均衡能力
+# 生产环境建议: 至少 2 个，避免单点故障
 replicaCount: 2
 
-# Container security context (default: empty - not secure)
+# --- 容器安全上下文 ---
+# 作用: 控制容器的安全运行属性，防止特权容器带来的安全风险
+# runAsNonRoot: 容器内不允许以 root 用户运行
+# runAsUser/runAsGroup: 设置容器内进程运行的用户 ID（nginx 镜像默认用 101）
+# allowPrivilegeEscalation: 禁止容器获取额外特权（如修改 seccomp、capabilities）
+# readOnlyRootFilesystem: 将根文件系统设为只读，防止写入系统目录
+# capabilities.drop: 移除所有 Linux capabilities，限制容器权限
 securityContext:
   runAsNonRoot: false
   runAsUser: 101
@@ -17,21 +25,32 @@ securityContext:
     drop:
       - ALL
 
-# Pod security context (default: empty)
+# --- Pod 安全上下文 ---
+# 作用: 作用于整个 Pod（所有容器共享），控制 Pod 级别的安全属性
+# fsGroup: 让所有容器内的进程都属于该组，可访问挂载的 volumes
 podSecurityContext:
   runAsNonRoot: false
   fsGroup: 101
 
-# Resources with limits (default: empty - no resource constraints)
+# --- 资源限制 ---
+# 作用: 防止单个容器耗尽节点资源，保障集群稳定性
+# requests: 调度用，节点必须满足此资源才能调度；计费用
+# limits: 上限用，超过后 CPU 会 throttle，内存会 OOMKilled
+# 生产环境建议: 根据实际负载配置，避免过高或过低
 resources:
   limits:
-    cpu: "200m"
-    memory: "256Mi"
+    cpu: "200m"      # CPU 上限：最多使用 0.2 个 CPU 核心
+    memory: "256Mi"   # 内存上限：超过此值会被 OOM Kill
   requests:
-    cpu: "100m"
-    memory: "128Mi"
+    cpu: "100m"       # CPU 请求：用于调度和计费
+    memory: "128Mi"   # 内存请求：用于调度和计费
 
-# Enhanced liveness probe with timing tuning (default: basic config only)
+# --- 存活探针 (Liveness Probe) ---
+# 作用: 检测容器是否存活，如果探测失败，Kubernetes 会重启容器
+# 应用场景: 适用于容器进程本身崩溃（而非外部依赖故障）的情况
+# initialDelaySeconds: 容器启动后等待 10 秒再开始探测，给应用足够的启动时间
+# periodSeconds: 每 10 秒探测一次
+# failureThreshold: 连续 3 次失败后重启容器
 livenessProbe:
   httpGet:
     path: /
@@ -40,7 +59,12 @@ livenessProbe:
   periodSeconds: 10
   failureThreshold: 3
 
-# Enhanced readiness probe with timing tuning (default: basic config only)
+# --- 就绪探针 (Readiness Probe) ---
+# 作用: 检测容器是否就绪（可以接收流量），未就绪时从 Service 负载均衡中移除
+# 应用场景: 适用于应用需要预热、加载数据、等待依赖就绪的场景
+# initialDelaySeconds: 容器启动后等待 5 秒再开始探测
+# periodSeconds: 每 5 秒探测一次
+# failureThreshold: 连续 3 次失败后将容器标记为 NotReady
 readinessProbe:
   httpGet:
     path: /
@@ -49,7 +73,11 @@ readinessProbe:
   periodSeconds: 5
   failureThreshold: 3
 
-# Autoscaling tuning (default: minReplicas: 1, targetCPUUtilizationPercentage: 80)
+# --- 自动扩缩容配置 (HPA) ---
+# 作用: 根据 CPU 使用率自动调整 Pod 副本数
+# minReplicas: 最小副本数，防止缩容到 0；建议生产环境至少 2
+# maxReplicas: 最大副本数，防止过多副本耗尽集群资源
+# targetCPUUtilizationPercentage: CPU 使用率目标值，达到此值时扩容
 autoscaling:
   minReplicas: 2
   maxReplicas: 10
