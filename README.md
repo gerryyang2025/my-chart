@@ -142,12 +142,77 @@ Note:
 ## Chart Structure
 
 ```
-mychart/               # Default chart (scaffolded by helm create)
-├── Chart.yaml          # Chart metadata
-├── charts/             # Chart dependencies
-├── templates/          # Kubernetes manifest templates
-└── values.yaml         # Default configuration values
+mychart/
+├── Chart.yaml                    # Chart metadata (name, version, appVersion)
+├── charts/                       # Chart dependencies (subcharts)
+├── templates/                    # Kubernetes manifest templates
+│   ├── _helpers.tpl              # Reusable template functions and labels
+│   ├── deployment.yaml           # Deployment manifest
+│   ├── service.yaml              # Service manifest
+│   ├── serviceaccount.yaml       # ServiceAccount manifest
+│   ├── ingress.yaml              # Ingress manifest (external access)
+│   ├── hpa.yaml                  # HorizontalPodAutoscaler manifest
+│   ├── httproute.yaml            # HTTPRoute manifest (Gateway API)
+│   ├── NOTES.txt                 # Post-install instructions
+│   └── tests/                    # Helm test resources
+│       └── test-connection.yaml  # Pod connectivity test (helm.sh/hook: test)
+├── .helmignore                   # Files to exclude from packaging
+└── values.yaml                   # Default configuration values
 ```
+
+### Template Files
+
+| File | Kind | Description |
+|------|------|-------------|
+| `_helpers.tpl` | N/A | 定义可复用的模板函数：名称生成、标准标签、ServiceAccount 名 |
+| `deployment.yaml` | Deployment | 主应用工作负载，管理 Pod 副本数、容器配置、探针等 |
+| `service.yaml` | Service | 内部服务发现，暴露 Deployment 给集群内其他组件 |
+| `serviceaccount.yaml` | ServiceAccount | Pod 访问 Kubernetes API 的身份凭证 |
+| `ingress.yaml` | Ingress | 外部 HTTP/HTTPS 访问（传统方式） |
+| `hpa.yaml` | HorizontalPodAutoscaler | 自动扩缩容，根据 CPU/内存调整副本数 |
+| `httproute.yaml` | HTTPRoute | Gateway API 方式暴露服务（现代方式） |
+| `NOTES.txt` | N/A | `helm install` 后显示的使用说明 |
+
+### Chart.yaml
+
+```yaml
+apiVersion: v2              # Chart API 版本（v2 支持 library charts）
+name: mychart               # Chart 名称
+description: A Helm chart for Kubernetes
+type: application           # chart 类型：application 或 library
+version: 1.0.0              # Chart 版本（Semantic Versioning）
+appVersion: "1.16.0"        # 实际应用版本
+```
+
+### values.yaml
+
+控制模板渲染的默认配置：
+
+| 配置项 | 说明 |
+|--------|------|
+| `replicaCount` | Pod 副本数，默认 1 |
+| `image.repository` | 容器镜像仓库 |
+| `image.tag` | 镜像 tag（默认为 appVersion） |
+| `image.pullPolicy` | 镜像拉取策略：Always / IfNotPresent / Never |
+| `service.type` | Service 类型：ClusterIP / NodePort / LoadBalancer |
+| `service.port` | Service 暴露的端口 |
+| `ingress.enabled` | 是否启用 Ingress |
+| `autoscaling.enabled` | 是否启用 HPA 自动扩缩容 |
+| `resources` | 容器 CPU/内存资源限制 |
+| `livenessProbe` | 存活探针配置 |
+| `readinessProbe` | 就绪探针配置 |
+
+### Labels
+
+所有资源通过 `_helpers.tpl` 注入标准 Kubernetes 标签：
+
+| Label | 来源 |
+|-------|------|
+| `helm.sh/chart` | Chart name + version |
+| `app.kubernetes.io/name` | 应用名称 |
+| `app.kubernetes.io/instance` | Helm release 名称 |
+| `app.kubernetes.io/version` | 应用版本（appVersion） |
+| `app.kubernetes.io/managed-by` | 固定值 `Helm` |
 
 ## License
 
