@@ -175,7 +175,7 @@ Common Examples:
     ./optools.sh helm show chart mychart                  # Show Chart.yaml contents
     ./optools.sh helm show values mychart                 # Show values.yaml contents
     ./optools.sh helm show all mychart                    # Show Chart.yaml + values.yaml (full details)
-    ./optools.sh helm pull mychart                        # Download chart to local directory
+    ./optools.sh helm pull mychart                        # Download chart from configured repo
 EOF
 }
 
@@ -331,10 +331,14 @@ while [[ $# -gt 0 ]]; do
             # Skip 'helm' itself, it's the tool name
             shift
             ;;
-        lint|template|install|uninstall|upgrade|rollback|history|list|get|show|inspect|pull|package|registry|repo|plugin|search|chart|env|version|status|help)
+        lint|template|install|uninstall|upgrade|rollback|history|list|get|show|inspect|package|registry|repo|plugin|search|chart|env|version|status|help)
             # These are common helm commands - treat as passthrough
             COMMAND="helm"
             HELM_ARGS+=("$1")
+            shift
+            ;;
+        pull)
+            COMMAND="helm pull"
             shift
             ;;
         *)
@@ -528,6 +532,40 @@ case "${COMMAND}" in
 
         echo ""
         echo "==> succ: chart pushed successfully"
+        ;;
+    "helm pull")
+        load_env
+        setup_helm
+
+        # Extract chart name from args (first non-flag arg)
+        CHART_NAME=""
+        CHART_VERSION=""
+        for arg in "${HELM_ARGS[@]}"; do
+            if [[ -z "${CHART_NAME}" && ! "${arg}" =~ ^- ]]; then
+                CHART_NAME="${arg}"
+            elif [[ -n "${CHART_NAME}" && -z "${CHART_VERSION}" && ! "${arg}" =~ ^- ]]; then
+                CHART_VERSION="${arg}"
+            fi
+        done
+
+        if [[ -z "${CHART_NAME}" ]]; then
+            echo "ERROR: chart name is required." >&2
+            echo "Usage: $0 helm pull <chart-name> [version]" >&2
+            echo "       Example: $0 helm pull mychart 1.0.0" >&2
+            exit 1
+        fi
+
+        # Validate env vars for repo access
+        require_env "HELM_REPO_NAME" "HELM_REPO_NAME"
+
+        # Build pull target: repo_name/chart_name
+        PULL_TARGET="${HELM_REPO_NAME}/${CHART_NAME}"
+        if [[ -n "${CHART_VERSION}" ]]; then
+            PULL_TARGET="${PULL_TARGET} --version ${CHART_VERSION}"
+        fi
+
+        echo "==> Running: helm pull ${PULL_TARGET}"
+        "${HELM_BIN}" pull ${PULL_TARGET}
         ;;
     "helm")
         # Pass through arbitrary helm commands
